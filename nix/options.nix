@@ -23,6 +23,7 @@ in
       ./gce.nix
       ./hetzner.nix
       ./container.nix
+      ./nixops-container.nix
       ./libvirtd.nix
     ];
 

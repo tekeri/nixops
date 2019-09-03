@@ -313,7 +313,7 @@ rec {
           digitalOcean = optionalAttrs (v.config.deployment.targetEnv == "digitalOcean") v.config.deployment.digitalOcean;
           gce = optionalAttrs (v.config.deployment.targetEnv == "gce") v.config.deployment.gce;
           hetzner = optionalAttrs (v.config.deployment.targetEnv == "hetzner") v.config.deployment.hetzner;
-          container = optionalAttrs (v.config.deployment.targetEnv == "container") v.config.deployment.container;
+          container = optionalAttrs (v.config.deployment.targetEnv == "container" || v.config.deployment.targetEnv == "nixops-container") v.config.deployment.container;
           route53 = v.config.deployment.route53;
           virtualbox =
             let cfg = v.config.deployment.virtualbox; in
