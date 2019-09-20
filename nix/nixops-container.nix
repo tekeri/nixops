@@ -150,7 +150,8 @@ in
 
       networkConfig = {
         Private = "yes";
-        Zone = "nix-${ shortUuid }"; # optional?
+        #Zone = "nix-${ shortUuid }"; # optional?
+        #Zone = "nix-default";
       };
 
     } deployment.container.nspawn ];

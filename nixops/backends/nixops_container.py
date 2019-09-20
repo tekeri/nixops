@@ -137,6 +137,15 @@ class NixOpsContainerState(MachineState):
         """Wait until the SSH port is open on this machine."""
         return True
 
+    def _update_ipv4(self):
+        #self._host_run_command("$sudo machinectl -l | grep % | grep -Po '\d+\.\d+.\d+.\d+'".replace('%', self.vm_id), check=False)
+        #self._host_run_command("$sudo systemd-run -tqM % /run/current-system/sw/bin/ip a".replace('%', self.vm_id), check=False)
+        #hostlocal_ipv4 = self._host_run_command("$sudo machinectl shell -q % /run/current-system/sw/bin/ip -br addr show dev host0 | grep -Po '\d+\.\d+.\d+.\d+';".replace('%', self.vm_id), capture_stdout=True, check=False).rstrip()
+        hostlocal_ipv4 = self._host_run_command("COLUMNS=500 $sudo machinectl list -l | grep % | grep -Po '\d+\.\d+.\d+.\d+';".replace('%', self.vm_id), capture_stdout=True, check=False).rstrip()
+        if hostlocal_ipv4 == "":
+            raise Exception("cannot get container private IP address")
+        self.private_ipv4 = hostlocal_ipv4
+
     @property
     def resource_id(self):
         return self.vm_id
@@ -219,13 +228,7 @@ class NixOpsContainerState(MachineState):
             self.start(send_keys=False)
 
         if self.private_ipv4 is None:
-            #self._host_run_command("$sudo machinectl -l | grep % | grep -Po '\d+\.\d+.\d+.\d+'".replace('%', self.vm_id), check=False)
-            #self._host_run_command("$sudo systemd-run -tqM % /run/current-system/sw/bin/ip a".replace('%', self.vm_id), check=False)
-            #hostlocal_ipv4 = self._host_run_command("$sudo machinectl shell -q % /run/current-system/sw/bin/ip -br addr show dev host0 | grep -Po '\d+\.\d+.\d+.\d+';".replace('%', self.vm_id), capture_stdout=True, check=False).rstrip()
-            hostlocal_ipv4 = self._host_run_command("COLUMNS=500 $sudo machinectl list -l | grep % | grep -Po '\d+\.\d+.\d+.\d+';".replace('%', self.vm_id), capture_stdout=True, check=False).rstrip()
-            if hostlocal_ipv4 == "":
-                raise Exception("cannot get container private IP address")
-            self.private_ipv4 = hostlocal_ipv4
+            self._update_ipv4()
             self.log("IP address is {0}".format(self.private_ipv4))
 
         if self.public_host_key is None:
@@ -372,7 +375,9 @@ class NixOpsContainerState(MachineState):
             cmd = "$sudo machinectl start {0}".format(self.vm_id)
             self._host_run_command(cmd, set_state=self.STARTING)
             self.state = self.UP
-            if send_keys: self.send_keys()
+            if send_keys:
+                self._update_ipv4()
+                self.send_keys()
         except SSHCommandFailed as e:
             self.check()
             raise
@@ -392,4 +397,5 @@ class NixOpsContainerState(MachineState):
         res.exists = self.state != self.MISSING
         res.is_up = self.state in [self.STARTING, self.UP, self.STOPPING]
         if self.state == self.UP:
+            self._update_ipv4()
             MachineState._check(self, res)
