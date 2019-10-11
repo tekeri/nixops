@@ -141,7 +141,7 @@ class NixOpsContainerState(MachineState):
         #self._host_run_command("$sudo machinectl -l | grep % | grep -Po '\d+\.\d+.\d+.\d+'".replace('%', self.vm_id), check=False)
         #self._host_run_command("$sudo systemd-run -tqM % /run/current-system/sw/bin/ip a".replace('%', self.vm_id), check=False)
         #hostlocal_ipv4 = self._host_run_command("$sudo machinectl shell -q % /run/current-system/sw/bin/ip -br addr show dev host0 | grep -Po '\d+\.\d+.\d+.\d+';".replace('%', self.vm_id), capture_stdout=True, check=False).rstrip()
-        hostlocal_ipv4 = self._host_run_command("COLUMNS=500 $sudo machinectl list -l | grep % | grep -Po '\d+\.\d+.\d+.\d+';".replace('%', self.vm_id), capture_stdout=True, check=False).rstrip()
+        hostlocal_ipv4 = self._host_run_command("COLUMNS=500 $sudo machinectl list -l | grep -w % | grep -Po '\d+\.\d+.\d+.\d+';".replace('%', self.vm_id), capture_stdout=True, check=False).rstrip()
         if hostlocal_ipv4 == "":
             raise Exception("cannot get container private IP address")
         self.private_ipv4 = hostlocal_ipv4
@@ -158,8 +158,10 @@ class NixOpsContainerState(MachineState):
     def get_physical_spec(self):
         """Set per-machine ssh public key."""
         # todo: cpus, memory, etc (like ansible's facts)
-        # "lscpu -J | jq 'reduce .lscpu[] as $item ({}; . + {($item.field[:-1]): $item.data} )'"
+        # "lscpu -J | jq -c 'reduce .lscpu[] as $item ({}; . + {($item.field[:-1]): $item.data} )'"
         # "lsmem -Jb | jq '.memory | map(.size) | add/1024/1024'"
+        #cmd =
+        #self.ssh.run_command(cmd, check_output=True)
         return {
             ('users', 'extraUsers', 'root', 'openssh',
              'authorizedKeys', 'keys'): [ self.client_public_key ]
