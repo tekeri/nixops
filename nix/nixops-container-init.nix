@@ -15,6 +15,7 @@ let nixos =
 
           boot.isContainer = true;
           networking.useDHCP = false;
+          networking.useHostResolvConf = false;
           services.openssh.enable = true;
           services.openssh.startWhenNeeded = false;
           services.openssh.extraConfig = "UseDNS no";
