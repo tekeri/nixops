@@ -215,7 +215,7 @@ in
       script = ''
         # stop launch if on the same container...
         [ $1 = @systemConfig@ ] && { echo Cannot start the container in itself >&2; exit 1; }
-        exec ${pkgs.systemd}/bin/systemd-nspawn --machine=${instanceId} --keep-unit $1/init
+        exec /run/current-system/sw/bin/systemd-nspawn --machine=${instanceId} --keep-unit $1/init
       '';
 
       postStop = ''

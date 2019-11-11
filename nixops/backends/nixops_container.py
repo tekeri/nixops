@@ -83,7 +83,7 @@ class NixOpsContainerState(MachineState):
         else:
             return m.get_ssh_flags(*args, **kwargs)
 
-    def _host_run_command(self, command, user=None, set_state=None, **kwargs):
+    def _host_run_command(self, command, user=None, set_state=None, systemctl_status_on_fail=None, **kwargs):
         """
         Execute a command on the host machine via SSH. if you are not root user,
         '$sudo' is replaced by 'sudo', otherwise ''.
@@ -104,6 +104,10 @@ class NixOpsContainerState(MachineState):
             if set_state is not None:
                 self.state = set_state
             return self.host_ssh.run_command(cmd, user=ssh_user, **kwargs)
+        except SSHCommandFailed as e:
+            if systemctl_status_on_fail is not None:
+                self._host_run_command("SYSTEMD_COLORS=1 $sudo systemctl status systemd-nspawn@{0}.service".format(systemctl_status_on_fail))
+            raise
         except SSHConnectionFailed as e:
             self.state = self.UNREACHABLE if self.state == self.UP else prev_state
             raise
@@ -178,7 +182,7 @@ class NixOpsContainerState(MachineState):
             "$sudo ln -snf {1}/systemd-nspawn@$INSTANCE_ID.service /etc/systemd$MUTABLE/system/; ",
             "$sudo systemctl daemon-reload; " if daemon_reload else "",
             "$sudo systemctl start systemd-nspawn@$INSTANCE_ID" if start else ""
-        ]).format(instance_id, path))
+        ]).format(instance_id, path), systemctl_status_on_fail=instance_id)
 
     def create_after(self, resources, defn):
         host = defn.host if defn else self.host
@@ -322,19 +326,20 @@ class NixOpsContainerState(MachineState):
         #  StatusText=Terminating..., StatusErrno=0, Result=exit-code, NRestarts=0, ...
         cmd = "$sudo systemctl show systemd-nspawn@{0}.service --value".format(self.vm_id)
         cmd += " -p LoadState,ActiveState,SubState,FragmentPath,LoadError"
-        statuses = self._host_run_command(cmd, capture_stdout=True).rstrip().split('\n')
+        statuses = self._host_run_command(cmd, capture_stdout=True).split('\n')
         active_state = statuses[1]
         if active_state == "failed": result = self.STOPPED
         elif active_state == "inactive":
             has_container = self._check_container_placed(statuses[3])
             if has_container is True: result = self.STOPPED
             elif has_container is False: result = self.MISSING
-            else: reuslt = self.UNKNOWN
+            else: result = self.UNKNOWN
         elif active_state == "activating" or active_state == "reloading": result = self.STARTING
         elif active_state == "active": result = self.UP  # may be changed to UNREACHABLE later
         elif active_state == "deactivating": result = self.STOPPING
         else: result = self.UNKNOWN  # "maintenance"
-        return statuses + [result]
+        statuses[5] = result
+        return statuses
 
     def _is_running(self):
         cmd = "$sudo machinectl show {0} -p State --value 2>&1".format(self.vm_id)
@@ -375,7 +380,7 @@ class NixOpsContainerState(MachineState):
         if self.state != self.UP: self.log("starting container...")
         try:
             cmd = "$sudo machinectl start {0}".format(self.vm_id)
-            self._host_run_command(cmd, set_state=self.STARTING)
+            self._host_run_command(cmd, set_state=self.STARTING, systemctl_status_on_fail=self.vm_id)
             self.state = self.UP
             if send_keys:
                 self._update_ipv4()
@@ -390,6 +395,7 @@ class NixOpsContainerState(MachineState):
             return
         try:
             statuses = self._ask_systemctl_state()
+            self.log(str(statuses))
         except:
             raise
         self.state = statuses[5]
